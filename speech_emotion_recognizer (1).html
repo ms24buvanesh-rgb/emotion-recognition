@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Speech Emotion Recognizer</title>
+  <style>
+    :root {
+      --bg: #f5f5f0;
+      --card: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #666;
+      --border: rgba(0,0,0,0.12);
+      --accent: #7f77dd;
+      --accent-light: #eeedfe;
+      --btn-bg: #7f77dd;
+      --btn-text: #fff;
+      --input-bg: #f8f8f5;
+      --result-bg: #f8f8f5;
+      --transition: 0.25s ease;
+    }
+
+    [data-theme="dark"] {
+      --bg: #1a1a1f;
+      --card: #26262e;
+      --text: #f0f0ee;
+      --text-muted: #a0a0a0;
+      --border: rgba(255,255,255,0.1);
+      --accent: #afa9ec;
+      --accent-light: #3c3489;
+      --btn-bg: #534ab7;
+      --btn-text: #f0f0ee;
+      --input-bg: #1e1e26;
+      --result-bg: #1e1e26;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+      transition: background var(--transition), color var(--transition);
+    }
+
+    .page {
+      max-width: 480px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ── Theme Toggle ── */
+    .theme-btn {
+      position: absolute;
+      top: 0; right: 0;
+      background: var(--card);
+      border: 0.5px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .theme-btn:hover { color: var(--text); }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 2.5rem 0 1.5rem;
+    }
+    header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    header p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 0.5px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      transition: background var(--transition);
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    /* ── Upload Area ── */
+    .upload-area {
+      border: 1.5px dashed var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      background: var(--input-bg);
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition);
+      position: relative;
+    }
+    .upload-area:hover { border-color: var(--accent); }
+    .upload-area input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+    }
+    .upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-area p { font-size: 13px; color: var(--text-muted); }
+    .upload-area strong { color: var(--accent); }
+
+    .file-name {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 500;
+      display: none;
+    }
+
+    /* ── Audio Preview ── */
+    .audio-preview {
+      margin-top: 12px;
+      display: none;
+    }
+    audio {
+      width: 100%;
+      border-radius: 8px;
+      height: 36px;
+      outline: none;
+    }
+
+    /* ── Mic Section ── */
+    .mic-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .divider { flex: 1; height: 0.5px; background: var(--border); }
+    .divider-text { font-size: 12px; color: var(--text-muted); }
+
+    .mic-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--input-bg);
+      border: 0.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      width: 100%;
+      justify-content: center;
+      transition: background var(--transition), border-color var(--transition);
+      margin-top: 10px;
+    }
+    .mic-btn:hover { border-color: var(--accent); }
+    .mic-btn.recording {
+      border-color: #e24b4a;
+      color: #e24b4a;
+      background: #fcebeb;
+    }
+    [data-theme="dark"] .mic-btn.recording { background: #501313; }
+
+    .mic-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      transition: background var(--transition);
+    }
+    .mic-btn.recording .mic-dot {
+      background: #e24b4a;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Analyze Button ── */
+    .analyze-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: opacity var(--transition), transform 0.1s;
+    }
+    .analyze-btn:hover { opacity: 0.9; }
+    .analyze-btn:active { transform: scale(0.98); }
+    .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Loading ── */
+    .loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 1rem 0;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error Message ── */
+    .error-msg {
+      display: none;
+      margin-top: 10px;
+      background: #fcebeb;
+      color: #a32d2d;
+      border: 0.5px solid #f09595;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+    [data-theme="dark"] .error-msg {
+      background: #501313;
+      color: #f7c1c1;
+      border-color: #791f1f;
+    }
+
+    /* ── Result Card ── */
+    .result-card {
+      display: none;
+      margin-top: 1rem;
+      background: var(--result-bg);
+      border: 0.5px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+      transition: background var(--transition);
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .emotion-emoji { font-size: 44px; line-height: 1; }
+    .emotion-label-wrap { flex: 1; }
+    .emotion-name { font-size: 22px; font-weight: 600; }
+    .emotion-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+    .confidence-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .conf-label { font-size: 13px; color: var(--text-muted); }
+    .conf-pct { font-size: 13px; font-weight: 600; color: var(--accent); }
+
+    .bar-bg {
+      height: 6px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--accent);
+      width: 0;
+      transition: width 0.8s cubic-bezier(.4,0,.2,1);
+    }
+
+    .all-emotions {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .emo-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .emo-icon { font-size: 15px; width: 20px; text-align: center; }
+    .emo-name { font-size: 13px; color: var(--text-muted); width: 58px; }
+    .emo-bar-bg {
+      flex: 1;
+      height: 5px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .emo-bar {
+      height: 100%;
+      border-radius: 3px;
+      width: 0;
+      transition: width 0.7s cubic-bezier(.4,0,.2,1);
+    }
+    .emo-pct {
+      font-size: 12px;
+      color: var(--text-muted);
+      width: 34px;
+      text-align: right;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 520px) {
+      header h1 { font-size: 20px; }
+      .card { padding: 1.2rem; }
+      .emotion-emoji { font-size: 36px; }
+      .emotion-name { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page" id="app">
+
+  <!-- Theme Toggle -->
+  <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">
+    <span id="themeIcon">☽</span>
+    <span id="themeLabel">Dark</span>
+  </button>
+
+  <!-- Header -->
+  <header>
+    <h1>Speech Emotion Recognizer</h1>
+    <p>Analyze emotions from your voice</p>
+  </header>
+
+  <!-- Main Card -->
+  <div class="card">
+
+    <!-- Upload -->
+    <div class="section-label">Upload audio</div>
+    <div class="upload-area" id="uploadArea">
+      <input type="file" accept=".wav,.mp3,.ogg,.m4a" id="fileInput" onchange="handleFile(this)">
+      <div class="upload-icon">🎙️</div>
+      <p><strong>Choose a .wav file</strong> or drag &amp; drop</p>
+      <p style="margin-top:4px;">WAV, MP3, OGG, M4A supported</p>
+    </div>
+    <div class="file-name" id="fileName"></div>
+    <div class="audio-preview" id="audioPreview">
+      <audio id="audioPlayer" controls></audio>
+    </div>
+
+    <!-- Mic -->
+    <div class="mic-row">
+      <div class="divider"></div>
+      <span class="divider-text">or</span>
+      <div class="divider"></div>
+    </div>
+    <button class="mic-btn" id="micBtn" onclick="toggleRecording()">
+      <div class="mic-dot" id="micDot"></div>
+      <span id="micLabel">Record from microphone</span>
+    </button>
+
+    <!-- Error -->
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- Analyze -->
+    <button class="analyze-btn" id="analyzeBtn" onclick="analyzeEmotion()">
+      Analyze Emotion
+    </button>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <span>Analyzing your voice...</span>
+    </div>
+
+    <!-- Result -->
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <div class="emotion-emoji" id="resultEmoji">😊</div>
+        <div class="emotion-label-wrap">
+          <div class="emotion-name" id="resultName">Happy</div>
+          <div class="emotion-sub">Detected emotion</div>
+        </div>
+      </div>
+      <div class="confidence-row">
+        <span class="conf-label">Confidence</span>
+        <span class="conf-pct" id="confPct">0%</span>
+      </div>
+      <div class="bar-bg">
+        <div class="bar-fill" id="confBar"></div>
+      </div>
+      <div class="section-label" style="margin-top:16px;">All emotions</div>
+      <div class="all-emotions" id="allEmotions"></div>
+    </div>
+
+  </div><!-- /card -->
+</div><!-- /page -->
+
+<script>
+  /* ── Emotion data ── */
+  const EMOTIONS = [
+    { name: "Happy",   emoji: "😊", color: "#ef9f27" },
+    { name: "Sad",     emoji: "😢", color: "#378add" },
+    { name: "Angry",   emoji: "😠", color: "#e24b4a" },
+    { name: "Neutral", emoji: "😐", color: "#888780" },
+  ];
+
+  let hasAudio    = false;
+  let isRecording = false;
+  let mediaRecorder = null;
+  let audioChunks   = [];
+
+  /* ── Theme ── */
+  const savedTheme = localStorage.getItem("ser-theme");
+  if (savedTheme === "dark") applyTheme("dark");
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    document.getElementById("themeIcon").textContent  = t === "dark" ? "☀" : "☽";
+    document.getElementById("themeLabel").textContent = t === "dark" ? "Light" : "Dark";
+    localStorage.setItem("ser-theme", t);
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute("data-theme");
+    applyTheme(current === "dark" ? "light" : "dark");
+  }
+
+  /* ── File Upload ── */
+  function handleFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    hasAudio = true;
+
+    document.getElementById("fileName").style.display = "block";
+    document.getElementById("fileName").textContent   = "📄 " + file.name;
+
+    const url    = URL.createObjectURL(file);
+    const player = document.getElementById("audioPlayer");
+    player.src   = url;
+    document.getElementById("audioPreview").style.display = "block";
+
+    hideError();
+    hideResult();
+  }
+
+  /* ── Microphone Recording ── */
+  async function toggleRecording() {
+    if (!isRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks  = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks, { type: "audio/wav" });
+          const url  = URL.createObjectURL(blob);
+          document.getElementById("audioPlayer").src             = url;
+          document.getElementById("audioPreview").style.display  = "block";
+          document.getElementById("fileName").style.display      = "block";
+          document.getElementById("fileName").textContent        = "🎤 Recorded audio";
+          hasAudio = true;
+          stream.getTracks().forEach(t => t.stop());
+          hideError();
+          hideResult();
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById("micBtn").classList.add("recording");
+        document.getElementById("micLabel").textContent = "Stop recording";
+
+      } catch (err) {
+        showError("⚠️ Microphone access denied. Please allow microphone permissions.");
+      }
+
+    } else {
+      mediaRecorder.stop();
+      isRecording = false;
+      document.getElementById("micBtn").classList.remove("recording");
+      document.getElementById("micLabel").textContent = "Record from microphone";
+    }
+  }
+
+  /* ── Analyze ── */
+  function analyzeEmotion() {
+    hideError();
+    if (!hasAudio) {
+      showError("⚠️ Please upload a file or record audio before analyzing.");
+      return;
+    }
+
+    const btn = document.getElementById("analyzeBtn");
+    btn.disabled = true;
+    document.getElementById("loading").style.display = "flex";
+    hideResult();
+
+    /* Simulate model inference delay */
+    setTimeout(() => {
+      document.getElementById("loading").style.display = "none";
+      btn.disabled = false;
+      showResult();
+    }, 1800);
+  }
+
+  /* ── Show Result ── */
+  function showResult() {
+    /* Pick a random top emotion and generate mock confidence scores */
+    const top     = EMOTIONS[Math.floor(Math.random() * EMOTIONS.length)];
+    const topConf = Math.floor(Math.random() * 30) + 55;  /* 55–84 */
+    const remaining = 100 - topConf;
+
+    const others = EMOTIONS.filter(e => e.name !== top.name);
+    let splits   = [Math.random(), Math.random(), Math.random()];
+    const total  = splits.reduce((a, b) => a + b, 0);
+    splits       = splits.map(s => Math.floor((s / total) * remaining));
+    splits[0]   += remaining - splits.reduce((a, b) => a + b, 0);
+
+    const allData = [{ ...top, conf: topConf }];
+    others.forEach((e, i) => allData.push({ ...e, conf: splits[i] }));
+    allData.sort((a, b) => b.conf - a.conf);
+
+    /* Top emotion */
+    document.getElementById("resultEmoji").textContent = top.emoji;
+    document.getElementById("resultName").textContent  = top.name;
+    document.getElementById("confPct").textContent     = topConf + "%";
+
+    /* Show card */
+    document.getElementById("resultCard").style.display = "block";
+
+    /* Animate confidence bar */
+    setTimeout(() => {
+      document.getElementById("confBar").style.width = topConf + "%";
+    }, 50);
+
+    /* Emotion breakdown */
+    const container = document.getElementById("allEmotions");
+    container.innerHTML = "";
+    allData.forEach((e, idx) => {
+      const row = document.createElement("div");
+      row.className = "emo-row";
+      row.innerHTML = `
+        <span class="emo-icon">${e.emoji}</span>
+        <span class="emo-name">${e.name}</span>
+        <div class="emo-bar-bg">
+          <div class="emo-bar" id="ebar-${idx}" style="background:${e.color}"></div>
+        </div>
+        <span class="emo-pct">${e.conf}%</span>
+      `;
+      container.appendChild(row);
+      setTimeout(() => {
+        document.getElementById("ebar-" + idx).style.width = e.conf + "%";
+      }, 80 + idx * 60);
+    });
+  }
+
+  /* ── Helpers ── */
+  function showError(msg) {
+    const el = document.getElementById("errorMsg");
+    el.textContent   = msg;
+    el.style.display = "block";
+  }
+  function hideError()  { document.getElementById("errorMsg").style.display  = "none"; }
+  function hideResult() { document.getElementById("resultCard").style.display = "none"; }
+</script>
+</body>
+</html>
